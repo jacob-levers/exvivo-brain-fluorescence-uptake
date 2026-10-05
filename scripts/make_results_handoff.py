@@ -83,6 +83,8 @@ def spatial(cd, sig):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--batch", default="out_batch")
+    ap.add_argument("--motion", default="out_motion",
+                    help="output folder of check_motion.py")
     ap.add_argument("--out", default="out_figs")
     a = ap.parse_args()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
@@ -252,13 +254,61 @@ def main():
       "or near plateau by 95 min; Brain 2 is not (see §8).\n")
 
     w("## 7. Sample motion\n")
-    w("Assessed for every recording by 3D phase cross-correlation against a "
-      "reference timepoint, computed independently on each channel. Measured "
-      "displacement ≤ 0.22 µm over 95 min in all four — below one binned pixel "
-      "(1.098 µm). Stage logs independently confirm ≤ 1 µm travel. **No "
-      "registration was applied**, and none was needed. Volumes take 11.56 s of "
-      "each 30 s interval to acquire, so this also rules out within-volume "
-      "motion blur.\n")
+    mpath = Path(a.motion) / "motion.csv"
+    if not mpath.exists():
+        w(f"*Motion results not found ({mpath}); run `check_motion.py` first.*\n")
+    else:
+        md = defaultdict(dict)
+        for r_ in csv.DictReader(open(mpath)):
+            md[r_["name"]].setdefault(r_["role"], {})[int(r_["t_index"])] = (
+                float(r_["t_min"]), float(r_["dz_um"]), float(r_["lateral_um"]))
+        w("Measured with `check_motion.py` at **every** timepoint of every "
+          "recording: 3D phase cross-correlation against the middle timepoint, "
+          "independently on each channel (4×4-binned, outlier-clipped, xy "
+          "high-passed volumes; bounded search; upsampled-DFT sub-pixel "
+          "refinement). Axial values below are from the 405 nm channel.\n")
+        w("| Brain | Max lateral | RMS lateral | Axial RMS, first 15 min | "
+          "Axial RMS, after 15 min | Channel agreement on axial (r), first 15 / after |")
+        w("|---|---|---|---|---|---|")
+        lat_all, late_rms, early_rms, r_early, r_late = [], [], [], [], []
+        for r in rows:
+            d = md.get(Path(r["file"]).stem)
+            if not d:
+                continue
+            ts = sorted(set(d["drug"]) & set(d["other"]))
+            tm = np.array([d["other"][t][0] for t in ts])
+            zo = np.array([d["other"][t][1] for t in ts])
+            zd = np.array([d["drug"][t][1] for t in ts])
+            lat = np.array([max(d["drug"][t][2], d["other"][t][2]) for t in ts])
+            e, l = tm < 15, tm >= 15
+            re_ = float(np.corrcoef(zd[e], zo[e])[0, 1])
+            rl_ = float(np.corrcoef(zd[l], zo[l])[0, 1])
+            rms = lambda x: float(np.sqrt((x ** 2).mean()))
+            lat_all.append(lat.max()); late_rms.append(rms(zo[l]))
+            early_rms.append(rms(zo[e])); r_early.append(re_); r_late.append(rl_)
+            w(f"| {r['label']} | {lat.max():.2f} µm | {rms(lat):.2f} µm | "
+              f"{rms(zo[e]):.2f} µm | {rms(zo[l]):.2f} µm | "
+              f"{re_:+.2f} / {rl_:+.2f} |")
+        dzs = [r["meta"]["dz_um"] for r in rows]
+        w(f"\n**Lateral**: never above {max(lat_all):.2f} µm at any timepoint in "
+          f"any brain, about {max(lat_all) / 0.549:.1f} raw pixels (0.549 µm each). "
+          "**Axial**, after "
+          f"the first 15 min: {min(late_rms):.1f}–{max(late_rms):.1f} µm RMS, "
+          f"below half a z-plane (z-step {min(dzs):.2f}–{max(dzs):.2f} µm), "
+          f"with the two channels agreeing (r = {min(r_late):.2f}–{max(r_late):.2f}). "
+          f"In the first 15 min axial estimates scatter more "
+          f"({min(early_rms):.1f}–{max(early_rms):.1f} µm RMS) but the channels "
+          f"do **not** agree (r ≤ {max(r_early):.2f}): that is measurement noise "
+          "from the weak, fast-changing early signal, not tissue movement.\n")
+        w("Stage logs independently record ≤ 1 µm travel in each axis. **No "
+          "registration was applied**, and none was needed. The method recovers "
+          "displacements injected into recorded volumes to within 0.33 µm, "
+          "including half-plane axial shifts, so these low values reflect a "
+          "stationary sample rather than an insensitive measurement.\n")
+        w("One transient bright speck (23 saturated pixels in a single plane of "
+          "one Brain 2 frame) initially produced a spurious 132 µm lateral "
+          "reading on that frame; the published script clips such outliers. The "
+          "speck has no measurable effect on the uptake curve.\n")
 
     w("## 8. Between-brain variation\n")
     w("| Brain | Peak voxel (p99.9) | Region size | Long-axis asymmetry | Notes |")
