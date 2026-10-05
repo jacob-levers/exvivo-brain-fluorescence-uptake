@@ -1,0 +1,24 @@
+# Whitelist: ignore everything, then allow only the code and documentation.
+#
+# This folder also holds the raw ND2 recordings and the binned caches built
+# from them (several hundred GB). They must never be committed, so nothing is
+# tracked unless it is listed explicitly below.
+
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/requirements.txt
+!/scripts/
+
+/scripts/*
+!/scripts/nd2_perfusion_3d.py
+!/scripts/pcc_bounded.py
+!/scripts/batch_uptake.py
+!/scripts/check_motion.py
+!/scripts/figure_stats.py
+!/scripts/figure_panels.py
+!/scripts/make_results_handoff.py
+!/scripts/viewer.py
+!/scripts/roi_tool.py
+!/scripts/test_depth.py

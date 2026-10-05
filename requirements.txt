@@ -1,0 +1,15 @@
+# Versions the analysis was run with (Python 3.12.7).
+nd2==0.11.3
+dask[array]==2026.8.0
+numpy==2.5.2
+scipy==1.18.1
+scikit-image==0.26.0
+matplotlib==3.11.1
+pillow==12.3.0
+imageio==2.37.4
+imageio-ffmpeg==0.6.0
+
+# Optional GPU acceleration for rendering and registration (NVIDIA only).
+# Every script falls back to NumPy/SciPy on the CPU when CuPy is absent;
+# results are the same, rendering is much slower.
+# cupy-cuda12x==14.2.0
